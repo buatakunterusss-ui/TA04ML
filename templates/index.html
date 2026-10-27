@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deteksi Penipuan Kartu Kredit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #eef2f4;
+    --panel: #ffffff;
+    --ink: #14262e;
+    --muted: #5d7079;
+    --line: #d5dee2;
+    --accent: #0f5d73;
+    --accent-soft: #e1eff3;
+    --safe: #1c7a4a;
+    --safe-soft: #e0f3e8;
+    --risk: #c0272d;
+    --risk-soft: #fbe5e5;
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0e1a1f;
+      --panel: #16262d;
+      --ink: #e6eef1;
+      --muted: #93a8b1;
+      --line: #28404a;
+      --accent: #5bb8d0;
+      --accent-soft: #1b3944;
+      --safe: #5fd08f;
+      --safe-soft: #17372a;
+      --risk: #ff7a7f;
+      --risk-soft: #3d1c1f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+    line-height: 1.5;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 32px 20px 56px; }
+
+  header { margin-bottom: 24px; }
+  h1 { font-size: 1.75rem; font-weight: 600; margin: 0 0 6px; letter-spacing: -0.01em; }
+  header p { margin: 0; color: var(--muted); max-width: 62ch; }
+
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; }
+  @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+  .panel + .panel { margin-top: 16px; }
+  h2 { font-size: 1.05rem; font-weight: 600; margin: 0 0 4px; }
+  .hint { color: var(--muted); font-size: 0.875rem; margin: 0 0 14px; }
+
+  .samples { display: flex; flex-wrap: wrap; gap: 8px; }
+  button {
+    font: inherit;
+    font-weight: 500;
+    border-radius: 8px;
+    padding: 10px 16px;
+    cursor: pointer;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--ink);
+    transition: background 0.15s, border-color 0.15s;
+  }
+  button:hover { border-color: var(--accent); }
+  button:focus-visible, input:focus-visible, summary:focus-visible {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+  }
+  .btn-risk { color: var(--risk); }
+  .btn-safe { color: var(--safe); }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; width: 100%; padding: 13px; font-size: 1rem; }
+  @media (prefers-color-scheme: dark) { .btn-primary { color: #06222b; } }
+  .btn-primary:hover { filter: brightness(1.08); }
+
+  .main-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  label { display: block; font-size: 0.85rem; font-weight: 500; margin-bottom: 4px; }
+  input[type="number"] {
+    width: 100%;
+    padding: 9px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+    font-size: 0.85rem;
+  }
+
+  details { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 14px; }
+  summary { cursor: pointer; font-weight: 500; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; font-size: 1.3rem; color: var(--muted); }
+  details[open] summary::after { content: "−"; }
+  .pca-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 10px; margin-top: 14px; }
+  .pca-grid label { font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace; font-weight: 400; color: var(--muted); }
+
+  .actions { margin-top: 20px; }
+
+  /* Panel hasil */
+  .result { position: sticky; top: 20px; }
+  .empty { color: var(--muted); font-size: 0.92rem; }
+  .verdict { border-radius: 8px; padding: 14px 16px; margin-bottom: 18px; }
+  .verdict.risk { background: var(--risk-soft); color: var(--risk); }
+  .verdict.safe { background: var(--safe-soft); color: var(--safe); }
+  .verdict .small { font-size: 0.82rem; opacity: 0.85; }
+  .verdict .big { font-size: 1.4rem; font-weight: 600; line-height: 1.25; }
+
+  .score { font-family: "IBM Plex Mono", ui-monospace, Consolas, monospace; font-size: 2.6rem; font-weight: 500; line-height: 1; }
+  .score-label { color: var(--muted); font-size: 0.85rem; margin: 4px 0 14px; }
+
+  .gauge { position: relative; height: 12px; border-radius: 6px; background: var(--line); }
+  .gauge-fill { height: 100%; border-radius: 6px; }
+  .gauge-fill.risk { background: var(--risk); }
+  .gauge-fill.safe { background: var(--safe); }
+  .gauge-mark { position: absolute; left: 50%; top: -5px; width: 2px; height: 22px; background: var(--ink); }
+  .gauge-scale { display: flex; justify-content: space-between; font-size: 0.75rem; color: var(--muted); margin-top: 8px; }
+  .gauge-mark-label { text-align: center; font-size: 0.75rem; color: var(--muted); margin-top: -2px; }
+  .explain { font-size: 0.85rem; color: var(--muted); margin-top: 16px; border-top: 1px solid var(--line); padding-top: 12px; }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .gauge-fill { animation: grow 0.7s ease-out; }
+    @keyframes grow { from { width: 0; } }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Deteksi Penipuan Transaksi Kartu Kredit</h1>
+    <p>Masukkan data satu transaksi untuk melihat probabilitas penipuan menurut model Logistic Regression. Anda bisa memuat contoh transaksi dari data uji untuk mencoba.</p>
+  </header>
+
+  <form method="POST" id="form">
+  <div class="layout">
+
+    <div>
+      <section class="panel">
+        <h2>Contoh transaksi</h2>
+        <p class="hint">Mengisi seluruh kolom dengan satu baris asli dari data uji.</p>
+        <div class="samples">
+          <button type="button" class="btn-risk" onclick="isi('fraud')">Muat contoh fraud</button>
+          <button type="button" class="btn-safe" onclick="isi('normal')">Muat contoh normal</button>
+          <button type="button" onclick="kosongkan()">Kosongkan</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Data transaksi</h2>
+        <p class="hint">Time dan Amount adalah nilai asli. Fitur V1 sampai V28 hasil transformasi PCA dari dataset.</p>
+
+        <div class="main-fields">
+          {% if 'Time' in columns %}
+          <div>
+            <label for="Time">Time (detik sejak transaksi pertama)</label>
+            <input type="number" step="any" id="Time" name="Time" value="{{ nilai.get('Time', 0) }}">
+          </div>
+          {% endif %}
+          {% if 'Amount' in columns %}
+          <div>
+            <label for="Amount">Amount (jumlah transaksi)</label>
+            <input type="number" step="any" id="Amount" name="Amount" value="{{ nilai.get('Amount', 0) }}">
+          </div>
+          {% endif %}
+        </div>
+
+        <details>
+          <summary>Fitur PCA (V1 sampai V28)</summary>
+          <div class="pca-grid">
+            {% for c in columns %}
+              {% if c not in ['Time', 'Amount'] %}
+              <div>
+                <label for="{{ c }}">{{ c }}</label>
+                <input type="number" step="any" id="{{ c }}" name="{{ c }}" value="{{ nilai.get(c, 0) }}">
+              </div>
+              {% endif %}
+            {% endfor %}
+          </div>
+        </details>
+
+        <div class="actions">
+          <button type="submit" class="btn-primary">Prediksi transaksi</button>
+        </div>
+      </section>
+    </div>
+
+    <aside class="panel result" id="hasil" aria-live="polite">
+      <h2>Hasil prediksi</h2>
+      {% if hasil %}
+        <div class="verdict {{ 'risk' if hasil.fraud else 'safe' }}">
+          <div class="small">Kesimpulan model</div>
+          <div class="big">{{ hasil.label }}</div>
+        </div>
+
+        <div class="score">{{ hasil.proba }}%</div>
+        <div class="score-label">probabilitas transaksi ini fraud</div>
+
+        <div class="gauge" role="img" aria-label="Probabilitas fraud {{ hasil.proba }} persen">
+          <div class="gauge-fill {{ 'risk' if hasil.fraud else 'safe' }}" style="width: {{ hasil.proba }}%"></div>
+          <div class="gauge-mark"></div>
+        </div>
+        <div class="gauge-scale"><span>0%</span><span>100%</span></div>
+        <div class="gauge-mark-label">garis tengah: ambang batas 50%</div>
+
+        <p class="explain">
+          {% if hasil.fraud %}
+          Probabilitas berada di atas ambang batas, sehingga transaksi ditandai berisiko dan sebaiknya diverifikasi sebelum diproses.
+          {% else %}
+          Probabilitas berada di bawah ambang batas, sehingga transaksi dianggap normal.
+          {% endif %}
+        </p>
+      {% else %}
+        <p class="empty">Belum ada prediksi. Muat contoh transaksi atau isi data sendiri, lalu klik “Prediksi transaksi”.</p>
+      {% endif %}
+    </aside>
+
+  </div>
+  </form>
+</div>
+
+<script>
+  const contoh = {{ contoh | tojson }};
+  function isi(jenis) {
+    for (const [k, v] of Object.entries(contoh[jenis])) {
+      const el = document.querySelector(`[name="${k}"]`);
+      if (el) el.value = v;
+    }
+  }
+  function kosongkan() {
+    document.querySelectorAll('#form input[type="number"]').forEach(el => el.value = 0);
+  }
+  {% if hasil %}
+  document.getElementById('hasil').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  {% endif %}
+</script>
+</body>
+</html>
